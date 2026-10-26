@@ -1,0 +1,7 @@
+screens/
+node_modules/
+*.env
+.env*
+secrets/
+*.log
+.DS_Store

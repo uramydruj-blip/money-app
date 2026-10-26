@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="uk">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#111315">
+<title>Бухгалтерія</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23181b1e'/%3E%3Cpath d='M14 44a18 18 0 1 1 36 0' fill='none' stroke='%237f868d' stroke-width='4' stroke-linecap='round'/%3E%3Cpath d='M32 44 44 26' stroke='%23c9925a' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="bg" id="bg" aria-hidden="true">
+  <div class="bg-aurora"><i class="blob b1"></i><i class="blob b2"></i><i class="blob b3"></i><i class="blob b4"></i></div>
+  <canvas class="bg-particles" id="bg-canvas"></canvas>
+  <div class="bg-carbon"></div>
+  <div class="bg-vignette"></div>
+</div>
+<div class="flash" id="flash" aria-hidden="true"></div>
+<div id="app">
+
+  <!-- ГОЛОВНИЙ ЕКРАН -->
+  <section class="screen active" id="scr-main">
+    <header class="topbar">
+      <div class="brand"><span class="brand-dot"></span>Бухгалтерія</div>
+      <div class="top-actions">
+        <button class="icon-btn" data-go="history" aria-label="Історія"><svg viewBox="0 0 24 24"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></button>
+        <button class="icon-btn" data-go="settings" aria-label="Налаштування"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg></button>
+      </div>
+    </header>
+
+    <div class="cluster hero">
+      <div class="hero-top"><span class="readout-label">Баланс · <span id="hero-month"></span></span>
+        <div class="cur-switch" id="cur-switch" role="tablist" aria-label="Валюта"><button data-cc="UAH">₴</button><button data-cc="EUR">€</button><button data-cc="USD">$</button></div></div>
+      <div class="odo-wrap">
+        <div class="odo-row"><span class="odo" id="odo"></span><span class="odo-cents" id="odo-cents"></span><span class="odo-cur" id="odo-cur">₴</span></div>
+        <div class="delta" id="delta"></div>
+      </div>
+      <div class="spark-wrap">
+        <svg id="spark" viewBox="0 0 300 64" preserveAspectRatio="none" aria-hidden="true"></svg>
+        <div class="spark-cap"><span id="spark-from"></span><span id="spark-max"></span><span>сьогодні</span></div>
+      </div>
+      <div class="ie">
+        <div class="ie-labels"><span><i class="dot" style="background:var(--pos)"></i>Дохід <b id="ie-inc">0</b></span><span>Витрати <b id="ie-exp">0</b><i class="dot" style="background:var(--neg);margin:0 0 0 5px"></i></span></div>
+        <div class="ie-bar"><i id="ie-bar-inc"></i><i id="ie-bar-exp"></i></div>
+      </div>
+      <div class="mini-stats">
+        <div><span>Сьогодні</span><b id="st-today">0 ₴</b></div>
+        <div class="sep"></div>
+        <div><span>Цей місяць</span><b id="st-month">0 ₴</b></div>
+        <div class="sep"></div>
+        <div><span>Залишок місяця</span><b id="st-net">0 ₴</b></div>
+      </div>
+      <div class="rates-line" id="rates-line"></div>
+    </div>
+
+    <div class="console">
+      <button class="act act-plus" id="btn-income"><span class="act-sign">+</span><span>Додати</span></button>
+      <button class="mic" id="btn-mic" aria-label="Голосовий ввід">
+        <span class="mic-ring"></span>
+        <svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+      </button>
+      <button class="act act-minus" id="btn-expense"><span class="act-sign">−</span><span>Витрата</span></button>
+    </div>
+    <div class="mic-hint" id="mic-hint">Скажи «кава 80» або «плюс 2000 зарплата»</div>
+    <button class="pill hidden" id="btn-home-main">📌 Додати на головний екран</button>
+
+    <div class="card" id="card-structure" data-go="history">
+      <div class="card-head"><span>Витрати за місяць</span><span class="link">Статистика ›</span></div>
+      <div class="stack-bar" id="stack-bar"></div>
+      <div class="stack-legend" id="stack-legend"></div>
+    </div>
+
+    <div class="card">
+      <div class="card-head"><span>Останні операції</span></div>
+      <div id="recent"></div>
+    </div>
+    <div class="bottom-space"></div>
+  </section>
+
+  <!-- ІСТОРІЯ -->
+  <section class="screen" id="scr-history">
+    <header class="topbar">
+      <button class="icon-btn back-btn" data-back aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="title">Статистика</div>
+      <div style="width:40px"></div>
+    </header>
+    <div class="seg seg3" id="mode-seg">
+      <button data-m="exp" class="on">Витрати</button><button data-m="inc">Надходження</button><button data-m="cmp">Порівняння</button>
+    </div>
+    <div class="seg" id="period-seg">
+      <button data-p="today">Сьогодні</button><button data-p="week">Тиждень</button><button data-p="month" class="on">Місяць</button><button data-p="all">Все</button>
+    </div>
+    <div class="summary">
+      <div><span>Витрати</span><b class="neg" id="sum-exp">0</b></div>
+      <div><span>Надходження</span><b class="pos" id="sum-inc">0</b></div>
+      <div><span>Різниця</span><b id="sum-net">0</b></div>
+    </div>
+
+    <div id="view-exp">
+      <div class="card">
+        <div class="donut-row">
+          <svg id="donut" viewBox="0 0 160 160"></svg>
+          <div class="donut-center"><span>Витрачено</span><b id="donut-total">0 ₴</b></div>
+        </div>
+        <div id="cat-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span id="ops-title">Операції</span><button class="link hidden" id="clear-filter">× скинути фільтр</button></div>
+        <div id="ops"></div>
+      </div>
+    </div>
+
+    <div id="view-inc" class="hidden">
+      <div class="card">
+        <div class="donut-row">
+          <svg id="donut-inc" viewBox="0 0 160 160"></svg>
+          <div class="donut-center"><span>Надійшло</span><b id="donut-inc-total" class="pos">0 ₴</b></div>
+        </div>
+        <div id="src-list"></div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span id="inc-bars-title">Надходження по днях</span></div>
+        <svg id="inc-bars" class="bars" viewBox="0 0 320 130"></svg>
+        <div class="kpis">
+          <div><span>Середнє / день</span><b id="inc-avg">0</b></div>
+          <div><span>Найбільше</span><b id="inc-max">0</b><small id="inc-max-note"></small></div>
+          <div><span>Операцій</span><b id="inc-count">0</b></div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-head"><span id="inc-ops-title">Надходження</span><button class="link hidden" id="clear-src">× скинути фільтр</button></div>
+        <div id="inc-ops"></div>
+      </div>
+    </div>
+
+    <div id="view-cmp" class="hidden">
+      <div class="card">
+        <div class="card-head"><span id="cmp-title">Надходження vs витрати</span><span class="legend"><i class="dot" style="background:var(--pos)"></i>дох. <i class="dot" style="background:var(--neg);margin-left:8px"></i>витр.</span></div>
+        <svg id="cmp-bars" class="bars" viewBox="0 0 320 140"></svg>
+      </div>
+      <div class="card">
+        <div class="kpis two">
+          <div><span>Результат періоду</span><b id="cmp-net">0</b></div>
+          <div><span>Норма заощаджень</span><b id="cmp-rate">—</b></div>
+        </div>
+        <div class="rate-bar"><i id="cmp-rate-bar"></i></div>
+        <p class="note small" id="cmp-rate-note" style="margin:8px 0 0"></p>
+      </div>
+      <div class="card">
+        <div class="card-head"><span id="cmp-prev-title">Порівняно з попереднім періодом</span></div>
+        <div id="cmp-prev"></div>
+      </div>
+    </div>
+    <div class="bottom-space"></div>
+  </section>
+
+  <!-- НАЛАШТУВАННЯ -->
+  <section class="screen" id="scr-settings">
+    <header class="topbar">
+      <button class="icon-btn back-btn" data-back aria-label="Назад"><svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg></button>
+      <div class="title">Налаштування</div>
+      <div style="width:40px"></div>
+    </header>
+    <div class="card">
+      <div class="row"><span>Валюта</span><select id="set-cur"></select></div>
+      <div class="row"><span>Фон</span><div class="mini-seg" id="set-bg"><button data-bg="aurora">Аврора</button><button data-bg="particles">Частинки</button><button data-bg="carbon">Карбон</button></div></div>
+      <div class="row"><span>Легкий режим <small class="muted" id="lite-auto"></small></span><div class="mini-seg" id="set-lite"><button data-lite="auto">Авто</button><button data-lite="on">Так</button><button data-lite="off">Ні</button></div></div>
+      <div class="row"><span>Сховище</span><b id="set-storage" class="muted"></b></div>
+      <div class="row"><span>Записів</span><b id="set-count" class="muted"></b></div>
+    </div>
+    <div class="card">
+      <div class="card-head"><span>Віджет / ярлик</span></div>
+      <p class="note">Ярлик на головному екрані телефону відкриває застосунок одразу — натисни мікрофон і скажи витрату.</p>
+      <button class="btn wide" id="btn-home">📌 Додати на головний екран</button>
+      <p class="note small" id="home-status"></p>
+    </div>
+    <div class="card">
+      <div class="card-head"><span>Резервна копія</span><span class="small muted" id="sync-status"></span></div>
+      <button class="btn accent wide" id="btn-backup">💾 Експорт резервної копії</button>
+      <p class="note small" id="backup-note" style="margin:8px 0 0">Файл JSON з усіма операціями. У Telegram — поділитися в чат або скопіювати в «Збережені».</p>
+      <div class="row" style="margin-top:6px"><span>Автокопії <small class="muted" id="snap-info"></small></span><button class="btn" id="btn-restore" style="height:36px">Відновити</button></div>
+      <div class="btn-row">
+        <button class="btn" id="btn-export">⬇ Експорт JSON</button>
+        <button class="btn" id="btn-import">⬆ Імпорт JSON</button>
+      </div>
+      <textarea id="io-text" class="io hidden" spellcheck="false" placeholder="Встав JSON сюди…"></textarea>
+      <div class="btn-row hidden" id="io-actions">
+        <button class="btn" id="btn-io-copy">Копіювати</button>
+        <button class="btn" id="btn-io-file">Файл…</button>
+        <button class="btn accent" id="btn-io-apply">Імпортувати</button>
+      </div>
+      <input type="file" id="io-file" accept="application/json,.json" class="hidden">
+    </div>
+    <div class="card">
+      <button class="btn wide danger" id="btn-wipe">Видалити всі дані</button>
+    </div>
+    <p class="note center small">Бухгалтерія · дані зберігаються в Telegram CloudStorage вашого акаунта</p>
+    <div class="bottom-space"></div>
+  </section>
+</div>
+
+<!-- ШТОРКА: додати/редагувати операцію -->
+<div class="scrim" id="scrim"></div>
+<div class="sheet" id="sheet-tx">
+  <div class="grab"></div>
+  <div class="sheet-title" id="tx-title">Нова витрата</div>
+  <div class="seg small hidden" id="tx-type">
+    <button data-t="expense">Витрата</button><button data-t="income">Дохід</button>
+  </div>
+  <label class="amount-field"><span class="amount-sign" id="tx-sign">−</span><input id="tx-amount" inputmode="decimal" placeholder="0" autocomplete="off"><span class="amount-cur" id="tx-cur">₴</span></label>
+  <div class="cur-seg" id="tx-curseg"><button data-cc="UAH">₴ грн</button><button data-cc="EUR">€ євро</button><button data-cc="USD">$ долар</button></div>
+  <div class="conv-hint" id="tx-conv"></div>
+  <div class="quick hidden" id="tx-quick"><button data-q="100">+100</button><button data-q="500">+500</button><button data-q="1000">+1000</button><button data-q="5000">+5000</button></div>
+  <div class="cat-grid" id="tx-cats"></div>
+  <div class="cat-grid hidden" id="tx-srcs"></div>
+  <input class="text-in" id="tx-note" placeholder="Примітка (необов'язково)" maxlength="80" autocomplete="off">
+  <input class="text-in date-in" id="tx-date" type="datetime-local">
+  <div class="btn-row">
+    <button class="btn danger hidden" id="tx-delete">Видалити</button>
+    <button class="btn accent wide" id="tx-save">Зберегти</button>
+  </div>
+</div>
+
+<!-- ШТОРКА: голос -->
+<div class="sheet tall" id="sheet-voice">
+  <div class="grab"></div>
+  <div class="voice-top">
+    <button class="voice-mic" id="voice-mic" aria-label="Слухати">
+      <span class="wave w1"></span><span class="wave w2"></span><span class="wave w3"></span>
+      <svg viewBox="0 0 24 24"><rect x="9" y="2.5" width="6" height="12" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21M8.5 21h7"/></svg>
+    </button>
+    <div class="voice-status" id="voice-status">Натисни і говори</div>
+    <div class="voice-transcript" id="voice-transcript"></div>
+  </div>
+  <form class="voice-form" id="voice-form" autocomplete="off">
+    <input class="text-in" id="voice-text" placeholder="або напиши: кава 80" enterkeyhint="done">
+    <button class="btn accent" type="submit">OK</button>
+  </form>
+  <div class="examples" id="voice-examples">
+    <button>кава 80</button><button>витратив 50 на автобус</button><button>плюс 2000 зарплата</button><button>мінус 120 їжа</button><button>потратил 200 на еду</button><button>кава 3 євро</button><button>замовлення на fiverr 150 доларів</button><button>плюс 500 доларів</button>
+  </div>
+  <div class="confirm hidden" id="confirm">
+    <div class="confirm-head"><span class="badge" id="cf-badge">Витрата</span><span class="muted small" id="cf-raw"></span></div>
+    <label class="amount-field sm"><span class="amount-sign" id="cf-sign">−</span><input id="cf-amount" inputmode="decimal"><span class="amount-cur" id="cf-cur">₴</span></label>
+    <div class="cur-seg sm" id="cf-curseg"><button data-cc="UAH">₴ грн</button><button data-cc="EUR">€ євро</button><button data-cc="USD">$ долар</button></div>
+    <div class="conv-hint" id="cf-conv"></div>
+    <div class="chip-scroll" id="cf-cats"></div>
+    <div class="chip-scroll hidden" id="cf-srcs"></div>
+    <input class="text-in" id="cf-note" placeholder="Примітка" maxlength="80">
+    <div class="btn-row">
+      <button class="btn" id="cf-swap">⇅ Тип</button>
+      <button class="btn" id="cf-cancel">Скасувати</button>
+      <button class="btn accent wide" id="cf-save">Зберегти</button>
+    </div>
+  </div>
+  <p class="note small center" id="voice-caveat"></p>
+</div>
+
+<div class="toast" id="toast"><span id="toast-text"></span><button id="toast-action"></button></div>
+
+<script src="parser.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
