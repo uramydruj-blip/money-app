@@ -38,7 +38,7 @@ body.tg .back-btn{visibility:hidden}
 .cluster{position:relative;margin:0 -4px;padding:16px 16px 14px;border-radius:26px;
   background:radial-gradient(120% 90% at 50% 35%,#1d2124 0%,#15181a 55%,#121416 100%);
   border:1px solid #23282c;box-shadow:inset 0 1px 0 rgba(255,255,255,.03),0 20px 40px -20px rgba(0,0,0,.6)}
-.delta{position:absolute;left:50%;top:-6px;transform:translate(-50%,0);font-weight:700;font-size:18px;opacity:0;pointer-events:none;font-variant-numeric:tabular-nums}
+.delta{position:absolute;left:50%;top:-4px;z-index:2;white-space:nowrap;font-size:16px;transform:translate(-50%,0);font-weight:700;font-size:18px;opacity:0;pointer-events:none;font-variant-numeric:tabular-nums}
 .delta.up{color:var(--pos);animation:deltaUp 1.4s ease-out}
 .delta.down{color:var(--neg);animation:deltaDown 1.4s ease-out}
 @keyframes deltaUp{0%{opacity:0;transform:translate(-50%,16px)}20%{opacity:1}100%{opacity:0;transform:translate(-50%,-34px)}}
@@ -48,17 +48,16 @@ body.tg .back-btn{visibility:hidden}
 .odo-row{display:flex;justify-content:center;align-items:baseline;gap:2px;margin:0;transition:color .5s}
 .odo-row.flash-up{color:#cfe0d3}
 .odo-row.flash-down{color:#e6c9c4}
-.odo{display:inline-flex;font-size:58px;font-weight:650;letter-spacing:-.5px;font-variant-numeric:tabular-nums;line-height:1}
-.odo .dg{display:inline-block;height:1.08em;overflow:hidden;width:.62em;text-align:center;transition:width .35s,opacity .35s;
-  -webkit-mask-image:linear-gradient(transparent 0,#000 18%,#000 82%,transparent 100%);mask-image:linear-gradient(transparent 0,#000 18%,#000 82%,transparent 100%)}
-.odo .dg.lead{width:0;opacity:0}
-.odo .strip{display:flex;flex-direction:column;will-change:transform}
-.odo .strip span{height:1.08em;line-height:1.08em}
-.odo .gs{width:.22em;transition:width .35s}
-.odo .gs.lead{width:0}
-.odo .sg{width:.5em;height:1.08em;line-height:1.08em}
-.odo-cents{font-size:24px;color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
-.odo-cur{font-size:30px;color:var(--muted);margin-left:6px;font-weight:500}
+.odo-row{--fs:58px;--cw:37px;--ch:67px;align-items:center}
+.odo{display:inline-flex;align-items:center;font-size:var(--fs);font-weight:650;letter-spacing:0;font-variant-numeric:tabular-nums lining-nums;font-feature-settings:"tnum" 1,"lnum" 1;line-height:var(--ch);height:var(--ch);white-space:nowrap}
+.odo .dg{display:inline-block;flex:none;width:var(--cw);height:var(--ch);line-height:var(--ch);overflow:hidden;text-align:center;contain:layout paint}
+.odo .strip{display:flex;flex-direction:column;will-change:transform;backface-visibility:hidden}
+.odo .strip span{display:block;height:var(--ch);line-height:var(--ch);text-align:center}
+.odo.rolling .dg{-webkit-mask-image:linear-gradient(transparent 0,#000 14%,#000 86%,transparent 100%);mask-image:linear-gradient(transparent 0,#000 14%,#000 86%,transparent 100%)}
+.odo .gs{flex:none;width:calc(var(--fs) * .2)}
+.odo .sg{flex:none;width:calc(var(--fs) * .5);text-align:center}
+.odo-cents{font-size:calc(var(--fs) * .42);align-self:flex-end;margin-bottom:calc(var(--ch) * .18);color:var(--muted);font-weight:600;font-variant-numeric:tabular-nums}
+.odo-cur{font-size:calc(var(--fs) * .52);align-self:flex-end;margin-bottom:calc(var(--ch) * .14);color:var(--muted);margin-left:calc(var(--fs) * .1);font-weight:500}
 .mini-stats{display:flex;justify-content:center;align-items:center;gap:16px;font-size:12.5px;color:var(--muted)}
 .mini-stats>div{display:flex;flex-direction:column;align-items:center;gap:2px}
 .mini-stats b{color:#c3c7cb;font-weight:600;font-size:14px;font-variant-numeric:tabular-nums}
@@ -156,7 +155,7 @@ select{background:var(--surface2);border:1px solid var(--line2);border-radius:10
 .grab{width:40px;height:4px;border-radius:2px;background:#3a4045;margin:2px auto 12px}
 .sheet-title{text-align:center;font-weight:650;font-size:16px;margin-bottom:8px}
 .amount-field{display:flex;align-items:baseline;justify-content:center;gap:6px;padding:8px 0 12px}
-.amount-field input{width:3ch;min-width:2ch;max-width:72%;background:none;border:0;outline:0;text-align:center;font-size:46px;font-weight:650;font-variant-numeric:tabular-nums;caret-color:var(--accent)}
+.amount-field input{width:3ch;min-width:1ch;max-width:100%;padding:0;margin:0;-webkit-appearance:none;appearance:none;border-radius:0;background:none;border:0;outline:0;text-align:center;font-size:46px;font-weight:650;font-variant-numeric:tabular-nums;caret-color:var(--accent)}
 .amount-field input::placeholder{color:#3d4348}
 .amount-sign{font-size:34px;color:var(--neg);font-weight:500}
 .amount-sign.inc{color:var(--pos)}
@@ -325,3 +324,8 @@ body.lite .b4{display:none}
 .flash.go{animation:flash .75s cubic-bezier(.2,.7,.3,1) both}
 @keyframes flash{0%{opacity:0}18%{opacity:1}100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.flash.go{animation:flashSoft .9s ease-out both}@keyframes flashSoft{0%{opacity:0}30%{opacity:.45}100%{opacity:0}}}
+
+/* iOS: поля < 16px викликають автозум — тримаємо 16px */
+input,select,textarea,.text-in{font-size:16px}
+.amount-field{min-width:0;flex-wrap:nowrap;overflow:hidden}
+.amount-field .amount-sign,.amount-field .amount-cur{flex:none}

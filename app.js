@@ -1,5 +1,6 @@
 /* Бухгалтерія — Telegram Mini App. Повністю статичний, без сервера. */
 'use strict';
+const APP_VERSION = '20261026.3';
 (function () {
 const tg = window.Telegram && window.Telegram.WebApp;
 const inTG = !!(tg && tg.initData);
@@ -262,49 +263,92 @@ const balance = () => state.tx.reduce((s, t) => s + (t.t === 'income' ? t.a : -t
 
 /* ---------------- Одометр (цифри, що прокручуються) ---------------- */
 const Odo = (() => {
-  const box = $('#odo'); let cur = 0, raf = 0, nd = 0, neg = false;
-  function build(digits) {
-    if (digits === nd) return; nd = digits; box.innerHTML = '';
-    const sign = document.createElement('span'); sign.className = 'sg'; sign.textContent = '−'; box.appendChild(sign);
-    for (let p = digits - 1; p >= 0; p--) {
-      const d = document.createElement('span'); d.className = 'dg'; d.dataset.p = p;
-      d.innerHTML = '<span class="strip">' + '0123456789'.split('').concat('0').map(x => `<span>${x}</span>`).join('') + '</span>';
-      box.appendChild(d);
-      if (p > 0 && p % 3 === 0) { const g = document.createElement('span'); g.className = 'gs'; g.dataset.p = p; box.appendChild(g); }
-    }
+  /* Надійний одометр:
+     • ширина клітинки цифри МІРЯЄТЬСЯ (макс. з 0–9 у реальному шрифті) → однакові клітинки навіть без tabular-nums;
+     • висота/зсув у цілих пікселях пристрою → без розмиття і «тремтіння»;
+     • розмір шрифту підганяється під ширину картки (fit-text);
+     • після анімації — статичні цифри з точним текстом (ніяких transform), отже кінцевий вигляд завжди правильний;
+     • lite / reduced-motion / ?odo=simple → простий лічильник (оновлення тексту в rAF). */
+  const box = $('#odo'), row = $('.odo-row'), wrap = row.parentElement;
+  const BASE = 58, MIN = 26;
+  let cur = 0, raf = 0, fs = BASE, cw = 0, ch = 0, sw = 0, gw = 0, dw100 = 0, lastCents = '';
+  const dpr = () => window.devicePixelRatio || 1;
+  const snap = (px) => Math.round(px * dpr()) / dpr();
+  const simple = () => /[?&]odo=simple/.test(location.search) || document.body.classList.contains('lite') || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function measureDigits() {
+    const p = document.createElement('span');
+    p.style.cssText = 'position:absolute;visibility:hidden;white-space:pre;left:-9999px;top:0;font-size:100px;';
+    p.className = 'odo-probe'; box.appendChild(p);
+    let w = 0; for (const d of '0123456789') { p.textContent = d; w = Math.max(w, p.getBoundingClientRect().width); }
+    p.remove(); return w || 60;
   }
-  function render(v) {
-    const a = Math.abs(v);
-    box.querySelector('.sg').style.display = v < -0.5 ? '' : 'none';
-    for (const d of box.querySelectorAll('.dg')) {
-      const p = +d.dataset.p, Pw = Math.pow(10, p);
-      let pos;
-      if (p === 0) pos = a % 10;
-      else { const dig = Math.floor(a / Pw) % 10, lower = a % Pw; pos = dig + Math.max(0, lower - (Pw - 1)); }
-      d.firstChild.style.transform = `translateY(${(-pos * 1.08).toFixed(4)}em)`;
-      d.classList.toggle('lead', p > 0 && a < Pw);
+  function metrics(size) {
+    fs = size; if (!dw100) dw100 = measureDigits();
+    cw = Math.ceil(dw100 * fs / 100) + 1; ch = Math.round(fs * 1.16); sw = Math.ceil(fs * 0.5); gw = Math.round(fs * 0.2);
+    row.style.setProperty('--fs', fs + 'px'); row.style.setProperty('--cw', cw + 'px'); row.style.setProperty('--ch', ch + 'px');
+  }
+  // підбір розміру: вся строка (знак, цифри, копійки, валюта) має влазити в картку
+  function fit(maxAbs, neg) {
+    const digits = String(Math.floor(Math.abs(maxAbs))).length, groups = Math.floor((digits - 1) / 3);
+    const avail = wrap.clientWidth - 12;
+    const width = (size) => { const k = size / BASE; return digits * (Math.ceil(dw100 * size / 100) + 1) + groups * Math.round(size * .2) + (neg ? Math.ceil(size * .5) : 0) + (lastCents ? size * .42 * 1.9 : 0) + size * .52 * 1.0 + 8 * k + 4; };
+    if (!dw100) dw100 = measureDigits();
+    let size = BASE; while (size > MIN && width(size) > avail) size -= 1;
+    if (size !== fs || !cw) metrics(size);
+  }
+  const groupsHTML = (str, cell) => { // str — цифри без знаку
+    let h = ''; const n = str.length;
+    for (let i = 0; i < n; i++) { h += cell(str[i], n - 1 - i); const p = n - 1 - i; if (p > 0 && p % 3 === 0) h += '<span class="gs"></span>'; }
+    return h;
+  };
+  function renderStatic(v) { // точний текст, без transform
+    const a = Math.abs(Math.trunc(v)), neg = v <= -1;
+    box.classList.remove('rolling');
+    box.innerHTML = (neg ? '<span class="sg">−</span>' : '') + groupsHTML(String(a), (d) => `<span class="dg st">${d}</span>`);
+    box.setAttribute('aria-label', (neg ? '−' : '') + a);
+  }
+  let strips = [];
+  function buildRolling(digits, neg) {
+    box.classList.add('rolling');
+    const strip = '<span class="strip">' + '01234567890'.split('').map(x => `<span>${x}</span>`).join('') + '</span>';
+    box.innerHTML = `<span class="sg" style="visibility:${neg ? 'visible' : 'hidden'}">−</span>` + groupsHTML('0'.repeat(digits), (_, p) => `<span class="dg" data-p="${p}">${strip}</span>`);
+    strips = [...box.querySelectorAll('.dg')].map(d => ({ p: +d.dataset.p, el: d, s: d.firstChild }));
+    box._gs = [...box.querySelectorAll('.gs')];
+  }
+  function renderRolling(v) {
+    const a = Math.abs(v); const sg = box.firstChild; if (sg && sg.classList.contains('sg')) sg.style.visibility = v <= -1 ? 'visible' : 'hidden';
+    for (const o of strips) {
+      const Pw = Math.pow(10, o.p);
+      const pos = o.p === 0 ? a % 10 : Math.floor(a / Pw) % 10 + Math.max(0, (a % Pw) - (Pw - 1));
+      o.s.style.transform = `translate3d(0,${-snap(pos * ch)}px,0)`;
+      o.el.style.visibility = (o.p > 0 && a < Pw) ? 'hidden' : 'visible';   // ширину не змінюємо під час руху
     }
-    for (const g of box.querySelectorAll('.gs')) g.classList.toggle('lead', a < Math.pow(10, +g.dataset.p));
   }
   function set(cents, animate = true) {
-    const to = cents / 100;
     const centsPart = Math.round(Math.abs(cents)) % 100;
-    $('#odo-cents').textContent = centsPart ? ',' + String(centsPart).padStart(2, '0') : '';
-    const toI = Math.trunc(to);
-    const from = cur;
-    build(Math.max(String(Math.floor(Math.abs(from))).length, String(Math.abs(toI)).length, 1));
+    lastCents = centsPart ? ',' + String(centsPart).padStart(2, '0') : '';
+    $('#odo-cents').textContent = lastCents;
+    const to = Math.trunc(cents / 100), from = cur;
     cancelAnimationFrame(raf);
-    if (!animate || from === toI) { cur = toI; render(cur); return; }
-    const dur = Math.min(1800, 900 + Math.log10(Math.abs(toI - from) + 1) * 180), t0 = performance.now();
+    fit(Math.max(Math.abs(from), Math.abs(to)), to < 0 || from < 0);
+    if (!animate || from === to) { cur = to; renderStatic(to); return; }
+    const dur = Math.min(1800, 900 + Math.log10(Math.abs(to - from) + 1) * 180), t0 = performance.now();
     const ease = (k) => 1 - Math.pow(1 - k, 4);
+    const useSimple = simple();
+    if (!useSimple) buildRolling(String(Math.floor(Math.max(Math.abs(from), Math.abs(to)))).length, to < 0 || from < 0);
     const step = (now) => {
       const k = Math.min(1, (now - t0) / dur);
-      cur = from + (toI - from) * ease(k); render(cur);
-      if (k < 1) raf = requestAnimationFrame(step); else { cur = toI; render(cur); raf = 0; }
+      cur = from + (to - from) * ease(k);
+      if (useSimple) renderStatic(Math.round(cur)); else renderRolling(cur);
+      if (k < 1) raf = requestAnimationFrame(step);
+      else { cur = to; raf = 0; fit(Math.abs(to), to < 0); renderStatic(to); }   // фінальний «знімок» — точний текст
     };
     raf = requestAnimationFrame(step);
   }
-  return { set, value: () => cur };
+  let rt = 0; addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(() => { if (!raf) { cw = 0; fit(Math.abs(cur), cur < 0); renderStatic(cur); } }, 150); });
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { dw100 = 0; cw = 0; if (!raf) { fit(Math.abs(cur), cur < 0); renderStatic(cur); } });
+  const text = () => (box.getAttribute('aria-label') || '') + lastCents;
+  return { set, value: () => cur, text };
 })();
 
 function flashBg(kind) {
@@ -647,13 +691,32 @@ function openTx(mode, type, t) {
   $('#tx-cur').textContent = sym(TX.cur); paintTxCur(); updTxConv();
   catGrid($('#tx-cats'), TX.cat, (c) => { TX.cat = c; });
   catGrid($('#tx-srcs'), TX.src, (c) => { TX.src = c; }, false, SRCS);
-  openSheet('sheet-tx');
+  openSheet('sheet-tx'); requestAnimationFrame(() => fitAmount($('#tx-amount')));
   if (mode === 'add') setTimeout(() => $('#tx-amount').focus(), 320);
 }
 $('#tx-type').addEventListener('click', e => { const b = e.target.closest('[data-t]'); if (b) { setTxType(b.dataset.t); H.select(); } });
 $('#tx-quick').addEventListener('click', e => { const b = e.target.closest('[data-q]'); if (!b) return; const cur = parseFloat(($('#tx-amount').value || '0').replace(',', '.')) || 0; $('#tx-amount').value = String(cur + +b.dataset.q); fitAmount($('#tx-amount')); updTxConv(); H.select(); });
-function fitAmount(inp) { inp.style.width = Math.max(2, (inp.value || inp.placeholder || '0').length + 0.6) + 'ch'; }
-$$('.amount-field input').forEach(inp => inp.addEventListener('input', e => { e.target.value = e.target.value.replace(/[^\d.,]/g, ''); fitAmount(e.target); }));
+// Автоширина поля суми: міряємо текст прихованим «дзеркалом» з тим самим шрифтом (WebKit не обрізає перші цифри)
+const amountMirror = (() => { const m = document.createElement('span'); m.setAttribute('aria-hidden', 'true'); m.style.cssText = 'position:absolute;left:-9999px;top:0;visibility:hidden;white-space:pre;'; document.body.appendChild(m); return m; })();
+function fitAmount(inp) {
+  const field = inp.closest('.amount-field'); if (!field) return;
+  if (!inp.dataset.base) inp.dataset.base = parseFloat(getComputedStyle(inp).fontSize) || 46;
+  const base = +inp.dataset.base, cs = getComputedStyle(inp);
+  const sign = field.querySelector('.amount-sign'), curEl = field.querySelector('.amount-cur');
+  const avail = Math.max(120, field.clientWidth - (sign ? sign.offsetWidth : 0) - (curEl ? curEl.offsetWidth : 0) - 28);
+  const txt = inp.value || inp.placeholder || '0';
+  const ms = amountMirror.style;
+  ms.fontFamily = cs.fontFamily; ms.fontWeight = cs.fontWeight; ms.letterSpacing = cs.letterSpacing; ms.fontVariantNumeric = 'tabular-nums';
+  let size = base; ms.fontSize = size + 'px'; amountMirror.textContent = txt; let w = amountMirror.getBoundingClientRect().width;
+  if (w > avail) { size = Math.max(22, Math.floor(size * avail / w)); ms.fontSize = size + 'px'; w = amountMirror.getBoundingClientRect().width; }
+  inp.style.fontSize = size + 'px';
+  inp.style.width = Math.ceil(Math.max(w, size * 0.7)) + 12 + 'px';   // + запас на каретку
+  inp.scrollLeft = 0;
+}
+// дозволяємо лише цифри та одну кому/крапку, не більше 2 знаків після коми, до 9 цифр перед
+function cleanAmount(v) { v = v.replace(/[^\d.,]/g, '').replace('.', ','); const i = v.indexOf(','); if (i >= 0) v = v.slice(0, i + 1) + v.slice(i + 1).replace(/,/g, '').slice(0, 2); const [ip, dp] = v.split(','); return ip.slice(0, 9) + (dp !== undefined ? ',' + dp : ''); }
+$$('.amount-field input').forEach(inp => { inp.addEventListener('input', e => { const c = cleanAmount(e.target.value); if (c !== e.target.value) e.target.value = c; fitAmount(e.target); }); inp.addEventListener('focus', () => requestAnimationFrame(() => fitAmount(inp))); });
+addEventListener('resize', () => $$('.amount-field input').forEach(fitAmount));
 $('#tx-save').addEventListener('click', () => {
   const a = toCents($('#tx-amount').value);
   if (!a || a <= 0) { H.notify('error'); shake($('#tx-amount')); return toast('Введи суму'); }
@@ -1034,6 +1097,7 @@ function demoData() {
   if (startParam === 'voice') setTimeout(() => Voice.open(), 700);
   else if (startParam === 'expense') setTimeout(() => openTx('add', 'expense'), 700);
   else if (startParam === 'income') setTimeout(() => openTx('add', 'income'), 700);
-  window.__app = { state, Store, deleteTx, BG, applyBg, flashBg, Odo, Rates, fmt, setDisplayCur, toDisp, Voice, P, balance, addTx, go, openTx, byCategory, inPeriod };
+  { const f = document.querySelector('#scr-settings .note.center.small'); if (f) f.textContent += ' · v' + APP_VERSION; }
+  window.__app = { version: APP_VERSION, odoText: () => Odo.text() + '\u00a0' + sym(), fitAmount, state, Store, deleteTx, BG, applyBg, flashBg, Odo, Rates, fmt, setDisplayCur, toDisp, Voice, P, balance, addTx, go, openTx, byCategory, inPeriod };
 })();
 })();
